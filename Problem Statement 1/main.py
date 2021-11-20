@@ -3,8 +3,13 @@ import numpy as np
 import pandas as pd
 import sys
 import os
+import phonenumbers
+from validate_email import validate_email
+from phonenumbers import geocoder, NumberParseException
+
 
 def replace_content(file) :
+    ''' Finds and changes headers into proper format. in place conversion, returns None '''
 
     new_file_content = ""
 
@@ -16,10 +21,46 @@ def replace_content(file) :
     
     file.write(new_file_content)
 
+def validate_us_numbers(df) :
+    '''takes in dataframe and validates phone number elements within phone number columns. '''
+
+    are_invalid_numbers = False
+
+    for column in df.columns :
+
+        if 'Phone Number' in column :
+            
+            for index, element in enumerate(df[column]) :
+                
+                try:
+                    if element:
+                        number = phonenumbers.parse(element, "US")
+                except NumberParseException:
+                    logging.debug(f"Invalid phone number entry FOUND at index value: {index} of column: {column} of element: [{element}]")
+                    are_invalid_numbers = True
+
+
+                if geocoder.country_name_for_number(number, "en") != 'United States' :
+                    logging.warning(f"Invalid US number FOUND: {number} at index value: {index} in column: {column}")
+                    are_invalid_numbers = True
+                    
+            if are_invalid_numbers :
+                logging.warning("Invalid numbers found")
+
+def validate_email_id(df) :
+    '''determines whether the emails in the dataframe are in valid format.'''
+    
+    for email_val in df['Agent Email Address'] :
+        if not(validate_email(email_address= email_val, check_format=True) ) :
+            logging.warning(f"Invalid email found : {email_val}")
 
 
 
 if __name__ == '__main__' :
+
+    logging.basicConfig(filename = "logfile.log", filemode='w', format='[%(asctime)s][%(levelname)s] %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.DEBUG)
+
+    logging.info("Program has started")
 
     nyl_list = []
 
@@ -67,6 +108,21 @@ if __name__ == '__main__' :
                     nyl_list.append(curr_file_name)
 
                     #replace_content(curr_file)
+
+                    df = pd.read_csv(curr_file_name)
+
+                    print(df['Agent License State (active)'])
+
+                    validate_us_numbers(df)
+
+                    #TODO: write logic for state valdiation!
+
+
+
+
+
+
+
 
 
 
