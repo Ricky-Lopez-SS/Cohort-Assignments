@@ -6,6 +6,17 @@ import os
 import phonenumbers
 from validate_email import validate_email
 from phonenumbers import geocoder, NumberParseException
+import matplotlib.pyplot as plt
+
+def remove_spaces(list) :
+
+    ret_str = ""
+
+    for i in range(0, len(list)) :
+        if list[i] :
+            ret_str += list[i] + ' '
+        
+    return ret_str
 
 
 def replace_content(file) :
@@ -41,7 +52,7 @@ def validate_us_numbers(df) :
 
 
                 if geocoder.country_name_for_number(number, "en") != 'United States' :
-                    logging.warning(f"Invalid US number FOUND: {number} at index value: {index} in column: {column}")
+                    logging.debug(f"Invalid US number FOUND: {number} at index value: {index} in column: {column}")
                     are_invalid_numbers = True
                     
             if are_invalid_numbers :
@@ -50,10 +61,46 @@ def validate_us_numbers(df) :
 def validate_email_id(df) :
     '''determines whether the emails in the dataframe are in valid format.'''
     
-    for email_val in df['Agent Email Address'] :
-        if not(validate_email(email_address= email_val, check_format=True) ) :
-            logging.warning(f"Invalid email found : {email_val}")
+    for index, email_val in enumerate(df['Agent Email Address']) :
 
+        is_valid = validate_email(
+            email_address=email_val,
+            check_format=True,
+            check_blacklist=False,
+            check_dns=False,
+            dns_timeout=10,
+            check_smtp=False,
+            smtp_timeout=10,
+            smtp_helo_host='my.host.name',
+            smtp_from_address='my@from.addr.ess',
+            smtp_skip_tls=True,
+            smtp_tls_context=None,
+            smtp_debug=True)
+
+        if not is_valid :
+            logging.warning(f"Invalid email found : {email_val} at index: {index}")
+
+def validate_states(df):
+    '''Checks all columns regarding state in dataframe and logs any invalid states.'''
+
+    contains_invalid_states = False
+
+    state_list = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'DC', 'FL', 'GA', 'GU', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY']
+
+
+    states = df[['Agent State', 'Agency State']]
+
+    for column in states :
+        for  index, element in enumerate(states[column]) :
+            if element not in state_list:
+
+                if not contains_invalid_states:
+                    contains_invalid_states = True
+
+                logging.debug(f"Invalid State found at index {index} : {element}")
+    
+    if contains_invalid_states : 
+        logging.warning(f"Invalid states found")
 
 
 if __name__ == '__main__' :
@@ -63,6 +110,7 @@ if __name__ == '__main__' :
     logging.info("Program has started")
 
     nyl_list = []
+    is_first_file = False
 
     files = os.listdir('resources')
 
@@ -76,9 +124,11 @@ if __name__ == '__main__' :
     curr_file_name = next_file_name = None
 
     for i, v in enumerate(files) :
+       
 
         if not curr_file_name : #current file is non-existent; must be first file read. 
             curr_file_name = 'resources/' + v
+            is_first_file = True
             continue
 
         next_file_name = 'resources/' + v
@@ -109,13 +159,48 @@ if __name__ == '__main__' :
 
                     #replace_content(curr_file)
 
-                    df = pd.read_csv(curr_file_name)
+                    
+                    if is_first_file :
+                        df = pd.read_csv(curr_file_name)
+                        is_first_file = False
 
-                    print(df['Agent License State (active)'])
-
+                    else : 
+                        df = pd.concat([df, pd.read_csv(curr_file_name)] , axis=0)
+                    
+                    #df = pd.read_csv(curr_file_name)
+                    
                     validate_us_numbers(df)
 
-                    #TODO: write logic for state valdiation!
+                    validate_email_id(df)
+
+                    validate_states(df)
+
+                    curr_file_name = next_file_name
+
+    print(f"9. Dataframe 1\n\n{df}\n")
+
+    group_by_agency_state = df.groupby("Agency State").count()
+
+    print(f"10. group by agency state\n\n {group_by_agency_state}\n" )
+
+    group_by_agency_state['Agency State'] = group_by_agency_state.index
+
+    df['Agent Full Name'] = df['Agent First Name'] + df['Agent Middle Name'] + df['Agent Last Name']
+
+    df['Agent Full Name'] = df['Agent Full Name'].apply(lambda x : remove_spaces(x.split(" ")) )
+
+    agent_info = df[['Agent Full Name' , 'Agent Writing Contract Start Date', 'Date when an agent became A2O']]
+
+    print(f"11. Agent info\n\n{agent_info}")
+
+    print(group_by_agency_state.columns)
+
+    
+    group_by_agency_state.plot(x='Agency State' , y='Agent Id', kind='bar', legend='False')
+    plt.show()
+    
+
+
 
 
 
