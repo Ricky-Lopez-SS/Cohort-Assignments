@@ -18,7 +18,6 @@ def remove_spaces(list) :
         
     return ret_str
 
-
 def replace_content(file) :
     ''' Finds and changes headers into proper format. in place conversion, returns None '''
 
@@ -119,65 +118,67 @@ if __name__ == '__main__' :
     if files[0] == '.DS_Store' :
         files.remove('.DS_Store')
 
-    print(files)
-
     curr_file_name = next_file_name = None
 
-    for i, v in enumerate(files) :
-       
+    for i, v in enumerate(files) : 
 
-        if not curr_file_name : #current file is non-existent; must be first file read. 
-            curr_file_name = 'resources/' + v
-            is_first_file = True
-            continue
+        curr_file_name = 'resources/' + v
+        
+        if not i : #the first file in the folder
 
-        next_file_name = 'resources/' + v
+            with open(curr_file_name, "r+") as curr_file : 
+                nyl_list.append(curr_file_name)
 
-        with open(curr_file_name, "r+") as curr_file, open(next_file_name, "r+") as next_file :
+                #replace_content(curr_file)
 
-            curr_line_count = sum(1 for line in curr_file)
-            next_line_count = sum(1 for line in next_file)
+                df = pd.read_csv(curr_file_name)
 
-            if abs(curr_line_count - next_line_count) > 500 :
+                validate_us_numbers(df)
 
-                curr_file_name = next_file_name
-                continue
+                validate_email_id(df)
 
-            else : 
+                validate_states(df)
+
+                prev_file_name = curr_file_name
+        
+        else:
+
+            with open(curr_file_name, "r+") as curr_file, open(prev_file_name, "r+") as prev_file:
                 
-                if curr_file_name in nyl_list :
-                    
-                    #print out that file has already been processed!
-                    print("Then it should be in here for the rest of the time.")
+                prev_line_count = sum(1 for line in prev_file)
+                curr_line_count = sum(1 for line in curr_file)
+
+                if abs(curr_line_count - prev_line_count) > 500 :
+                    prev_file_name = curr_file_name
                     continue
 
-                else : #begin processing
-                    
-                    print("it should  get in here a couple of times. ")
+                else:
 
-                    nyl_list.append(curr_file_name)
+                    if curr_file_name in nyl_list : 
 
-                    #replace_content(curr_file)
+                        logging.debug(f"file {curr_file_name} has already been processed.")
+                        print("Sorry, the file has already been processed. ")
 
-                    
-                    if is_first_file :
-                        df = pd.read_csv(curr_file_name)
-                        is_first_file = False
+                    else: 
 
-                    else : 
-                        df = pd.concat([df, pd.read_csv(curr_file_name)] , axis=0)
-                    
-                    #df = pd.read_csv(curr_file_name)
-                    
-                    validate_us_numbers(df)
+                        print("Currently running...")
 
-                    validate_email_id(df)
+                        nyl_list.append(curr_file_name)
 
-                    validate_states(df)
+                        #replace_content(curr_file)
 
-                    curr_file_name = next_file_name
+                        df = pd.concat([df, pd.read_csv(curr_file_name)], axis = 0)
 
-    print(f"9. Dataframe 1\n\n{df}\n")
+                        validate_us_numbers(df)
+
+                        validate_email_id(df)
+
+                        validate_states(df)
+
+                        prev_file_name = curr_file_name
+
+
+    print(f"\n9. Dataframe 1\n\n{df}\n")
 
     group_by_agency_state = df.groupby("Agency State").count()
 
@@ -193,10 +194,9 @@ if __name__ == '__main__' :
 
     print(f"11. Agent info\n\n{agent_info}")
 
-    print(group_by_agency_state.columns)
+    df.hist()
 
-    
-    group_by_agency_state.plot(x='Agency State' , y='Agent Id', kind='bar', legend='False')
+    group_by_agency_state.plot(x='Agency State' , y='Agent Id', kind='bar', legend='False', title='Group By Agency State')
     plt.show()
     
 
